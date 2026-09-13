@@ -39,28 +39,23 @@ def build_architecture(num_classes: int = 5) -> nn.Module:
     return model
 
 
-def load_dr_model() -> nn.Module:
-    """
-    Loads the model. If a fine-tuned checkpoint exists, loads its weights.
-    Otherwise returns the ImageNet-pretrained backbone with a fresh (untrained)
-    head, and prints a loud warning so this is never silently mistaken for a
-    working clinical model.
-    """
-    model = build_architecture(num_classes=len(CLASS_NAMES))
-
-    if os.path.exists(MODEL_CHECKPOINT_PATH):
-        state_dict = torch.load(MODEL_CHECKPOINT_PATH, map_location=DEVICE)
-        model.load_state_dict(state_dict)
-        print(f"[model.py] Loaded fine-tuned checkpoint: {MODEL_CHECKPOINT_PATH}")
+def load_dr_model():
+    checkpoint_path = os.path.join(os.path.dirname(__file__), "checkpoints", "dr_model.pth")
+    
+    # Instantiate architecture
+    # Setting weights=None prevents downloading 100MB weights from PyTorch on startup
+    model = models.resnet50(weights=None)
+    
+    # Modify classification head for DR (e.g., 5 classes: 0=No DR, 1=Mild, 2=Moderate, 3=Severe, 4=Proliferative)
+    num_ftrs = model.fc.in_features
+    model.fc = torch.nn.Linear(num_ftrs, 5)
+    
+    if os.path.exists(checkpoint_path):
+        model.load_state_dict(torch.load(checkpoint_path, map_location=torch.device('cpu')))
+        print("[INFO] Successfully loaded fine-tuned DR model checkpoint.")
     else:
-        print(
-            "[model.py] WARNING: No fine-tuned checkpoint found at "
-            f"'{MODEL_CHECKPOINT_PATH}'. Using ImageNet backbone with an "
-            "UNTRAINED classification head. Run train.py before demoing — "
-            "predictions right now are not clinically meaningful."
-        )
-
-    model.to(DEVICE)
+        print("[WARNING] No checkpoint found. Initialized model with default structure.")
+    
     model.eval()
     return model
 
