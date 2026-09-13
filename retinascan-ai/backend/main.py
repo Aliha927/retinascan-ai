@@ -9,45 +9,22 @@ from supabase import create_client, Client
 import json
 from datetime import datetime
 from typing import Optional
-from pathlib import Path
 
-env_path = Path(__file__).parent / ".env"
-load_dotenv(dotenv_path=env_path)
+load_dotenv()
 
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY", "")
-SUPABASE_URL = os.getenv("SUPABASE_URL", "")
-SUPABASE_KEY = os.getenv("SUPABASE_KEY", "")
+gemini_client = genai.Client(api_key=os.getenv("GEMINI_API_KEY"))
 
-# Safeguard initialization to prevent crash on startup if missing
-if not SUPABASE_URL or not SUPABASE_KEY:
-    print("[WARNING] SUPABASE_URL or SUPABASE_KEY missing in environment!")
-    supabase = None
-else:
-    supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
-
-if not GEMINI_API_KEY:
-    print("[WARNING] GEMINI_API_KEY missing in environment!")
-    gemini_client = None
-else:
-    gemini_client = genai.Client(api_key=GEMINI_API_KEY)
+SUPABASE_URL = os.getenv("SUPABASE_URL")
+SUPABASE_KEY = os.getenv("SUPABASE_KEY")  # use the "anon" public key here
+supabase: Client = create_client(SUPABASE_URL, SUPABASE_KEY)
 
 app = FastAPI(title="RetinaScan AI API - Hackathon Edition", version="3.0")
 
-origins = [
-    "http://localhost:5173",
-    "http://localhost:3000",
-    "https://retinascan-ai-three.vercel.app",
-]
-
-# If ALLOWED_ORIGINS env var exists, add those explicitly as well
-env_origins = os.getenv("ALLOWED_ORIGINS")
-if env_origins:
-    origins.extend([origin.strip() for origin in env_origins.split(",") if origin.strip()])
+allowed_origins = os.getenv("ALLOWED_ORIGINS", "*").split(",")
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=origins,
-    allow_origin_regex=r"https://.*\.vercel\.app",  # Automatically permits all Vercel deployments!
+    allow_origins=allowed_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -60,6 +37,12 @@ model = load_dr_model()
 
 
 def get_current_user_email(authorization: Optional[str]) -> str:
+    """
+    Verifies the Supabase JWT sent by the frontend (Authorization: Bearer <token>).
+    Returns the logged-in user's email, or 'anonymous' if no valid token was sent.
+    This does NOT block unauthenticated requests (kept permissive for demo speed) —
+    tighten this to raise HTTPException(401) if you want to require login.
+    """
     if not authorization or not authorization.startswith("Bearer "):
         return "anonymous"
     token = authorization.split(" ", 1)[1]
@@ -121,7 +104,7 @@ async def screen_retina(
 
     try:
         response = gemini_client.models.generate_content(
-            model='gemini-1.5-flash',  # <--- UPDATED VALID MODEL NAME
+            model='gemini-2.5-flash',
             contents=prompt,
             config=types.GenerateContentConfig(
                 response_mime_type="application/json"
@@ -135,7 +118,7 @@ async def screen_retina(
             "urdu_report": f"آپ کی اسکریننگ کا نتیجہ: {predicted_class}. براہ کرم ماہر امراض چشم سے رجوع کریں۔"
         }
 
-    # Save to Supabase
+    # Save to Supabase (persistent, cloud-hosted Postgres)
     try:
         supabase.table("scans").insert({
             "user_email": user_email,

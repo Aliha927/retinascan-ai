@@ -1,8 +1,25 @@
 """
 sort_dataset.py
 ---------------
-Sorts Kaggle DR datasets (e.g. APTOS 2019) into class folders automatically,
-supporting .png, .jpg, and .jpeg formats seamlessly.
+Most Kaggle DR datasets (e.g. APTOS 2019) ship as:
+    train_images/  (all images in one folder)
+    train.csv      (columns: id_code, diagnosis [0-4])
+
+train.py needs a folder-per-class structure instead. This script converts
+one into the other, with an automatic train/val split.
+
+USAGE:
+    python sort_dataset.py \
+        --csv train.csv \
+        --images_dir train_images \
+        --output_dir dataset \
+        --val_split 0.15
+
+CSV format expected: two columns - image filename (without extension) and
+an integer label 0-4, where:
+    0 = No DR, 1 = Mild, 2 = Moderate, 3 = Severe, 4 = Proliferative DR
+(This is the standard APTOS 2019 label scheme. If your dataset uses a
+different column layout, adjust ID_COL / LABEL_COL below.)
 """
 
 import argparse
@@ -15,24 +32,6 @@ from model import CLASS_NAMES  # keep label order identical everywhere
 
 ID_COL = "id_code"
 LABEL_COL = "diagnosis"
-SUPPORTED_EXTENSIONS = [".png", ".jpg", ".jpeg", ".PNG", ".JPG", ".JPEG"]
-
-
-def find_image_file(images_dir: str, image_id: str, preferred_ext: str = "") -> str:
-    """Helper function to search for the image file regardless of extension."""
-    # Try preferred extension first if provided
-    if preferred_ext:
-        candidate = os.path.join(images_dir, f"{image_id}{preferred_ext}")
-        if os.path.exists(candidate):
-            return candidate
-
-    # Fallback to checking all supported extensions
-    for ext in SUPPORTED_EXTENSIONS:
-        candidate = os.path.join(images_dir, f"{image_id}{ext}")
-        if os.path.exists(candidate):
-            return candidate
-
-    return ""
 
 
 def sort_dataset(csv_path: str, images_dir: str, output_dir: str, val_split: float, image_ext: str):
@@ -54,15 +53,12 @@ def sort_dataset(csv_path: str, images_dir: str, output_dir: str, val_split: flo
         for row in split_rows:
             label_idx = int(row[LABEL_COL])
             class_name = CLASS_NAMES[label_idx]
-
-            src = find_image_file(images_dir, row[ID_COL], image_ext)
-
-            if src:
-                filename = os.path.basename(src)
-                dst = os.path.join(output_dir, split_name, class_name, filename)
+            src = os.path.join(images_dir, f"{row[ID_COL]}{image_ext}")
+            dst = os.path.join(output_dir, split_name, class_name, f"{row[ID_COL]}{image_ext}")
+            if os.path.exists(src):
                 shutil.copy2(src, dst)
             else:
-                print(f"WARNING: missing image for ID {row[ID_COL]} in {images_dir}, skipping")
+                print(f"WARNING: missing image {src}, skipping")
 
     print(f"Done. {len(train_rows)} train images, {len(val_rows)} val images.")
     print(f"Output structure ready at: {output_dir}/train and {output_dir}/val")
@@ -74,7 +70,7 @@ if __name__ == "__main__":
     parser.add_argument("--images_dir", type=str, required=True)
     parser.add_argument("--output_dir", type=str, default="dataset")
     parser.add_argument("--val_split", type=float, default=0.15)
-    parser.add_argument("--image_ext", type=str, default=".jpg", help="Preferred extension e.g. .jpg or .png")
+    parser.add_argument("--image_ext", type=str, default=".png", help="e.g. .png or .jpg")
     args = parser.parse_args()
 
     sort_dataset(args.csv, args.images_dir, args.output_dir, args.val_split, args.image_ext)
