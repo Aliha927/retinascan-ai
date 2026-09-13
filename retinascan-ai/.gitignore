@@ -1,0 +1,23 @@
+# Secrets
+.env
+backend/.env
+frontend/.env
+
+# Python
+__pycache__/
+*.pyc
+venv/
+backend/venv/
+
+# Model artifacts & data (too large for git)
+backend/checkpoints/
+backend/dataset/
+backend/retinascan.db
+
+# Node
+frontend/node_modules/
+frontend/dist/
+
+# OS
+.DS_Store
+
