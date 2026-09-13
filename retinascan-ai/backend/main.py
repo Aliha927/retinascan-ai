@@ -39,7 +39,7 @@ origins = [
     "http://localhost:3000",
     "https://retinascan-ai-three.vercel.app",
 ]
-
+g
 # If ALLOWED_ORIGINS env var exists, add those explicitly as well
 env_origins = os.getenv("ALLOWED_ORIGINS")
 if env_origins:
