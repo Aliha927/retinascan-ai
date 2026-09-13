@@ -33,6 +33,11 @@ def _apply_clahe(image_np: np.ndarray) -> np.ndarray:
 def preprocess_image(image_bytes: bytes):
     """Preprocesses input bytes to (1, 3, 224, 224) tensor and normalized float numpy array."""
     pil_image = Image.open(io.BytesIO(image_bytes)).convert("RGB")
+    
+    # --- 512MB RAM GUARD ---
+    # Downscale large fundus photos immediately to prevent memory spikes on Render Free Tier
+    pil_image.thumbnail((512, 512))
+    
     image_np = np.array(pil_image)
 
     # Square center-crop
@@ -42,6 +47,7 @@ def preprocess_image(image_bytes: bytes):
     left = (w - crop_size) // 2
     image_np = image_np[top: top + crop_size, left: left + crop_size]
 
+    # Resize to exact model input size (224x224)
     image_np = cv2.resize(image_np, (IMAGE_SIZE, IMAGE_SIZE))
     image_np = _apply_clahe(image_np)
 
