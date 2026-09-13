@@ -33,16 +33,26 @@ else:
 
 app = FastAPI(title="RetinaScan AI API - Hackathon Edition", version="3.0")
 
-allowed_origins = os.getenv("ALLOWED_ORIGINS", "*").split(",")
+# Replace your current CORS setup with this:
+origins = [
+    "http://localhost:5173",
+    "http://localhost:3000",
+    "https://retinascan-ai-three.vercel.app",
+]
+
+# If ALLOWED_ORIGINS env var exists, add those explicitly as well
+env_origins = os.getenv("ALLOWED_ORIGINS")
+if env_origins:
+    origins.extend([origin.strip() for origin in env_origins.split(",") if origin.strip()])
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=allowed_origins,
+    allow_origins=origins,
+    allow_origin_regex=r"https://.*\.vercel\.app",  # Automatically permits all Vercel deployments!
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
 from model import load_dr_model, predict_dr
 from utils import preprocess_image, generate_gradcam_overlay
 
