@@ -33,13 +33,12 @@ else:
 
 app = FastAPI(title="RetinaScan AI API - Hackathon Edition", version="3.0")
 
-# Replace your current CORS setup with this:
 origins = [
     "http://localhost:5173",
     "http://localhost:3000",
     "https://retinascan-ai-three.vercel.app",
 ]
-g
+
 # If ALLOWED_ORIGINS env var exists, add those explicitly as well
 env_origins = os.getenv("ALLOWED_ORIGINS")
 if env_origins:
@@ -53,6 +52,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
 from model import load_dr_model, predict_dr
 from utils import preprocess_image, generate_gradcam_overlay
 
@@ -60,12 +60,6 @@ model = load_dr_model()
 
 
 def get_current_user_email(authorization: Optional[str]) -> str:
-    """
-    Verifies the Supabase JWT sent by the frontend (Authorization: Bearer <token>).
-    Returns the logged-in user's email, or 'anonymous' if no valid token was sent.
-    This does NOT block unauthenticated requests (kept permissive for demo speed) —
-    tighten this to raise HTTPException(401) if you want to require login.
-    """
     if not authorization or not authorization.startswith("Bearer "):
         return "anonymous"
     token = authorization.split(" ", 1)[1]
@@ -127,7 +121,7 @@ async def screen_retina(
 
     try:
         response = gemini_client.models.generate_content(
-            model='gemini-2.5-flash',
+            model='gemini-1.5-flash',  # <--- UPDATED VALID MODEL NAME
             contents=prompt,
             config=types.GenerateContentConfig(
                 response_mime_type="application/json"
@@ -141,7 +135,7 @@ async def screen_retina(
             "urdu_report": f"آپ کی اسکریننگ کا نتیجہ: {predicted_class}. براہ کرم ماہر امراض چشم سے رجوع کریں۔"
         }
 
-    # Save to Supabase (persistent, cloud-hosted Postgres)
+    # Save to Supabase
     try:
         supabase.table("scans").insert({
             "user_email": user_email,
